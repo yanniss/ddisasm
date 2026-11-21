@@ -248,7 +248,20 @@ invalid(EA,Type):-
         must_fallthrough(EA,Dest),  Type = "must_fallthrough to invalid"
     ),
     !instruction(Dest,_,_,_,_,_,_,_,_,_),
-    Dest != 0.
+    Dest != 0,
+    !zero_size_function_call(EA,Dest).
+
+/**
+A direct call to the start of a function symbol that has no bytes of its own
+(e.g. `void f(void) { __builtin_unreachable(); }` placed at the end of a
+section) is a call all the same: the missing instruction there does not make
+the call data.
+*/
+.decl zero_size_function_call(EA:address,Dest:address)
+
+zero_size_function_call(EA,Dest):-
+    direct_call(EA,Dest),
+    defined_symbol(Dest,0,"FUNC",_,_,_,_,_,_).
 
 /**
 Largest instruction in the binary
