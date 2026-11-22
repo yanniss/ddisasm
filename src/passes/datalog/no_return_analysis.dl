@@ -113,18 +113,19 @@ last_in_scc(Scc,MaxIndex):-
 .decl block_in_scc_no_return(Block:address)
 
 scc_partial_no_return(Scc,0):-
-    in_scc(Scc,0,Block),
-    block_in_scc_no_return(Block).
+    block_in_scc_no_return(Block),
+    in_scc(Scc,0,Block).
 
 scc_partial_no_return(Scc,N+1):-
     scc_partial_no_return(Scc,N),
     in_scc(Scc,N+1,Block),
     block_in_scc_no_return(Block).
+.plan 1:(3,2,1)
 
 // if all the blocks do not return, then the scc does not return
 scc_no_return(Scc):-
-    last_in_scc(Scc,MaxBlockIndex),
-    scc_partial_no_return(Scc,MaxBlockIndex).
+    scc_partial_no_return(Scc,MaxBlockIndex),
+    last_in_scc(Scc,MaxBlockIndex).
 
 // we assign no_return to all the blocks in the scc
 no_return(Block):-
@@ -148,19 +149,58 @@ block_call_no_return(Block):-
 block_in_scc_no_return(Block):-
     block_call_no_return(Block).
 
+// Every jump and fallthrough out of the SCC (if any) leads to a block
+// that does not return: one rule per combination of the two.
+// The original rule (pre-optimization) is below, the optimized expansion
+// fixes the join order per case.       
+//
+// block_in_scc_no_return(Block):-
+//      in_scc(_,_,Block),
+//      !incomplete_block(Block),
+//      !return(Block),
+//      (
+//          direct_jump_outside_scc(Block,Dest),
+//          no_return(Dest)
+//          ;
+//          !direct_jump_outside_scc(Block,_)
+//      ),
+//      (
+//          fallthrough_outside_scc(Block,Dest2),
+//          no_return(Dest2)
+//          ;
+//          !fallthrough_outside_scc(Block,_)
+//      ).
+
+    
 block_in_scc_no_return(Block):-
     in_scc(_,_,Block),
     !incomplete_block(Block),
     !return(Block),
-    (
-        direct_jump_outside_scc(Block,Dest),
-        no_return(Dest)
-        ;
-        !direct_jump_outside_scc(Block,_)
-    ),
-    (
-        fallthrough_outside_scc(Block,Dest2),
-        no_return(Dest2)
-        ;
-        !fallthrough_outside_scc(Block,_)
-    ).
+    !direct_jump_outside_scc(Block,_),
+    !fallthrough_outside_scc(Block,_).
+
+block_in_scc_no_return(Block):-
+    no_return(Dest),
+    direct_jump_outside_scc(Block,Dest),
+    in_scc(_,_,Block),
+    !incomplete_block(Block),
+    !return(Block),
+    !fallthrough_outside_scc(Block,_).
+
+block_in_scc_no_return(Block):-
+    no_return(Dest2),
+    fallthrough_outside_scc(Block,Dest2),
+    in_scc(_,_,Block),
+    !incomplete_block(Block),
+    !return(Block),
+    !direct_jump_outside_scc(Block,_).
+
+block_in_scc_no_return(Block):-
+    no_return(Dest),
+    direct_jump_outside_scc(Block,Dest),
+    no_return(Dest2),
+    fallthrough_outside_scc(Block,Dest2),
+    in_scc(_,_,Block),
+    !incomplete_block(Block),
+    !return(Block).
+.plan 1:(3,4,2,1,5)
