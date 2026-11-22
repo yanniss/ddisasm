@@ -322,8 +322,9 @@ invalid(EA,"arm64-udf"):-
     binary_isa("ARM64"),
     instruction_get_operation(EA,"UDF").
 
+// A run of three or more INT3 is padding, not code, in any file format:
+// left as code, each INT3 becomes a block of its own.
 invalid(EA+1,"INT3"):-
-    binary_format("PE"),
     (
          binary_isa("X86");
          binary_isa("X64")
